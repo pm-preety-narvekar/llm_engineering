@@ -1,6 +1,7 @@
 import openai
+
+# TODO: use api_key in OpenAI object
 client = openai.OpenAI(
-    api_key="sk-4e7h5BLXEa-N5FX430dmHw",
     base_url="https://llm.pubmatic.com"
 )
 response = client.chat.completions.create(
