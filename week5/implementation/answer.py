@@ -29,7 +29,7 @@ Context:
 vectorstore = Chroma(persist_directory=DB_NAME, embedding_function=embeddings)
 retriever = vectorstore.as_retriever()
 # TODO: use api_key in OpenAI object 
-llm = ChatOpenAI(temperature=0, model_name=MODEL, base_url="https://llm.pubmatic.com")
+llm = ChatOpenAI(temperature=0, model_name=MODEL, api_key="sk-4e7h5BLXEa-N5FX430dmHw", base_url="https://llm.pubmatic.com")
 
 
 def fetch_context(question: str) -> list[Document]:
