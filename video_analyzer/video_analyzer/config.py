@@ -36,10 +36,11 @@ class Settings:
     max_frames: int = 24
     vision_batch_size: int = 8
     max_audio_bytes: int = 24 * 1024 * 1024
+    max_download_bytes: int = 500 * 1024 * 1024
 
     @staticmethod
     def from_env() -> "Settings":
-        key = "sk-4e7h5BLXEa-N5FX430dmHw" #os.environ.get("OPENAI_API_KEY", "").strip()
+        key = "TODO: update" #os.environ.get("OPENAI_API_KEY", "").strip()
         if not key:
             raise ValueError(
                 "OPENAI_API_KEY is not set. Copy .env.example to .env and add your key."
@@ -66,4 +67,7 @@ class Settings:
             frame_interval_sec=float(_env("VIDEO_ANALYZER_FRAME_INTERVAL_SEC", "15")),
             max_frames=int(_env("VIDEO_ANALYZER_MAX_FRAMES", "24")),
             vision_batch_size=int(_env("VIDEO_ANALYZER_VISION_BATCH_SIZE", "8")),
+            max_download_bytes=int(
+                _env("VIDEO_ANALYZER_MAX_DOWNLOAD_BYTES", str(500 * 1024 * 1024))
+            ),
         )

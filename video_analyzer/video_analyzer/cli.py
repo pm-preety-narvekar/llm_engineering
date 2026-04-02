@@ -15,8 +15,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "video",
-        type=Path,
-        help="Path to a video file (e.g. .mp4)",
+        type=str,
+        help="Local path to a video file, or http(s) URL (downloaded to a temp file first)",
     )
     p.add_argument(
         "--frame-interval",
@@ -76,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _format_output(result: AnalysisResult) -> str:
     parts = []
+    parts.append(f"**Source:** {result.source}\n\n")
     if result.duration_sec is not None:
         parts.append(f"**Duration:** {result.duration_sec:.1f}s\n")
     parts.append("## Summary\n\n")

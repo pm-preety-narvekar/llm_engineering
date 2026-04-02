@@ -89,8 +89,9 @@ def extract_frames_even_interval(
     max_frames: int,
 ) -> list[tuple[Path, float]]:
     """
-    Extract JPEG frames every `interval_sec`, capped at `max_frames`.
-    Returns list of (jpeg_path, timestamp_sec).
+    Extract PNG frames every ``interval_sec``, capped at ``max_frames``.
+    Uses PNG (not MJPEG) so odd dimensions (e.g. 1440×780) and full-range YUV do not break encoding.
+    Returns list of (image_path, timestamp_sec).
     """
     if interval_sec <= 0:
         raise ValueError("interval_sec must be positive")
@@ -103,7 +104,7 @@ def extract_frames_even_interval(
     t = 0.0
     idx = 0
     while t < duration and len(frames) < max_frames:
-        out_file = tmp / f"frame_{idx:05d}.jpg"
+        out_file = tmp / f"frame_{idx:05d}.png"
         cmd = [
             "ffmpeg",
             "-y",
@@ -111,10 +112,12 @@ def extract_frames_even_interval(
             str(t),
             "-i",
             str(video_path),
+            "-an",
+            "-sn",
             "-frames:v",
             "1",
-            "-q:v",
-            "2",
+            "-vcodec",
+            "png",
             str(out_file),
         ]
         try:

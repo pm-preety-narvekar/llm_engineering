@@ -16,11 +16,15 @@ from video_analyzer.media import (
     get_duration_sec,
     has_audio_stream,
 )
+from video_analyzer.remote import local_video_path
 
 
 @dataclass
 class AnalysisResult:
+    """``video_path`` is the local file analyzed. ``source`` is the path or URL you passed."""
+
     video_path: Path
+    source: str
     duration_sec: float | None
     transcript: str | None
     visual_notes: str
@@ -29,7 +33,8 @@ class AnalysisResult:
 
 def _data_url_for_image(path: Path) -> str:
     b64 = base64.standard_b64encode(path.read_bytes()).decode("ascii")
-    return f"data:image/jpeg;base64,{b64}"
+    mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    return f"data:{mime};base64,{b64}"
 
 
 def _pick_torch_device_and_dtype() -> tuple[str | int, str]:
@@ -56,8 +61,8 @@ class VideoAnalyzerAgent:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or Settings.from_env()
         self.client = OpenAI(
-            api_key="abc", #TODO: update #api_key=self.settings.openai_api_key,
-            base_url="https://llm.pubmatic.com" #base_url=self.settings.openai_base_url,
+            api_key= "TODO: update", #self.settings.openai_api_key,
+            base_url="https://llm.pubmatic.com" #self.settings.openai_base_url,
         )
         self._hf_asr_pipe: object | None = None
 
@@ -193,47 +198,52 @@ class VideoAnalyzerAgent:
 
     def analyze(
         self,
-        video_path: Path,
+        video_path: str | Path,
         *,
         frame_interval_sec: float | None = None,
         max_frames: int | None = None,
         include_frames: bool = True,
     ) -> AnalysisResult:
-        path = video_path.expanduser().resolve()
-        if not path.is_file():
-            raise FileNotFoundError(path)
+        with local_video_path(
+            video_path,
+            max_download_bytes=self.settings.max_download_bytes,
+        ) as (path, source):
+            ensure_ffmpeg()
+            duration = get_duration_sec(path)
 
-        ensure_ffmpeg()
-        duration = get_duration_sec(path)
+            interval = (
+                frame_interval_sec
+                if frame_interval_sec is not None
+                else self.settings.frame_interval_sec
+            )
+            cap = max_frames if max_frames is not None else self.settings.max_frames
 
-        interval = frame_interval_sec if frame_interval_sec is not None else self.settings.frame_interval_sec
-        cap = max_frames if max_frames is not None else self.settings.max_frames
+            transcript: str | None = None
+            if has_audio_stream(path):
+                with tempfile.TemporaryDirectory(prefix="video_analyzer_audio_") as td:
+                    mp3 = Path(td) / "audio.mp3"
+                    extract_audio_mp3(path, mp3)
+                    transcript = self.transcribe(mp3)
+                    if not transcript:
+                        transcript = None
 
-        transcript: str | None = None
-        if has_audio_stream(path):
-            with tempfile.TemporaryDirectory(prefix="video_analyzer_audio_") as td:
-                mp3 = Path(td) / "audio.mp3"
-                extract_audio_mp3(path, mp3)
-                transcript = self.transcribe(mp3)
-                if not transcript:
-                    transcript = None
+            visual_notes = ""
+            if include_frames:
+                frames = extract_frames_even_interval(path, interval, cap)
+                batches: list[str] = []
+                bs = max(1, self.settings.vision_batch_size)
+                for i in range(0, len(frames), bs):
+                    chunk = frames[i : i + bs]
+                    batches.append(self.describe_frame_batch(chunk))
+                visual_notes = "\n\n".join(b for b in batches if b)
 
-        visual_notes = ""
-        if include_frames:
-            frames = extract_frames_even_interval(path, interval, cap)
-            batches: list[str] = []
-            bs = max(1, self.settings.vision_batch_size)
-            for i in range(0, len(frames), bs):
-                chunk = frames[i : i + bs]
-                batches.append(self.describe_frame_batch(chunk))
-            visual_notes = "\n\n".join(b for b in batches if b)
+            summary = self.summarize(transcript, visual_notes, duration)
 
-        summary = self.summarize(transcript, visual_notes, duration)
-
-        return AnalysisResult(
-            video_path=path,
-            duration_sec=duration,
-            transcript=transcript,
-            visual_notes=visual_notes,
-            summary=summary,
-        )
+            return AnalysisResult(
+                video_path=path,
+                source=source,
+                duration_sec=duration,
+                transcript=transcript,
+                visual_notes=visual_notes,
+                summary=summary,
+            )
