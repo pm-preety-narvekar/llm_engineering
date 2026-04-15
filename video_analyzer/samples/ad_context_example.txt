@@ -1,0 +1,9 @@
+# Sample local context for: python -m video_analyzer VIDEO --context-file samples/ad_context_example.txt --webpage-url URL
+# Lines starting with # are ignored by the demo parser only if you strip them — this file is passed as-is to the model.
+
+# Advertiser vertical: K–12 educational worksheets (math focus).
+# Likely product: printable or digital math worksheets; may promote a companion app for extra practice.
+# Brand hints: family-friendly, emphasis on "practice at home" and printable PDFs.
+# Notes for icon: look for square app-style icons or logo URLs on the campaign landing page.
+
+this ad is abour bluetooth headphones

@@ -12,6 +12,7 @@ license = { text = "MIT" }
 dependencies = [
     "openai>=1.40.0",
     "python-dotenv>=1.0.0",
+    "curl-cffi>=0.7.0",
 ]
 
 [project.optional-dependencies]

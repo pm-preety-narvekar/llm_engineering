@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import json
+import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +39,17 @@ def _data_url_for_image(path: Path) -> str:
     return f"data:{mime};base64,{b64}"
 
 
+def _parse_llm_json_object(text: str) -> dict:
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```\w*\n?", "", text)
+        text = re.sub(r"\n?```\s*$", "", text)
+    obj = json.loads(text)
+    if not isinstance(obj, dict):
+        raise ValueError("expected a JSON object")
+    return obj
+
+
 def _pick_torch_device_and_dtype() -> tuple[str | int, str]:
     """Return (device, dtype_str) for transformers ASR."""
     try:
@@ -61,8 +74,8 @@ class VideoAnalyzerAgent:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or Settings.from_env()
         self.client = OpenAI(
-            api_key= "TODO: update", #self.settings.openai_api_key,
-            base_url="https://llm.pubmatic.com" #self.settings.openai_base_url,
+            api_key=self.settings.openai_api_key,
+            base_url=self.settings.openai_base_url,
         )
         self._hf_asr_pipe: object | None = None
 
@@ -195,6 +208,64 @@ class VideoAnalyzerAgent:
             max_tokens=2000,
         )
         return (resp.choices[0].message.content or "").strip()
+
+    def infer_ad_metadata_json(
+        self,
+        result: AnalysisResult,
+        context_file_text: str,
+        webpage_text: str,
+    ) -> dict[str, str]:
+        """
+        Combine video analysis with local file + webpage text; return
+        ``title``, ``icon_url``, ``button_txt`` (``Get`` or ``install app``), ``description`` (two lines).
+        """
+        body = "\n".join(
+            [
+                "## Video analysis summary",
+                result.summary,
+                "",
+                "## Transcript",
+                result.transcript or "(none)",
+                "",
+                "## Visual notes",
+                result.visual_notes or "(none)",
+                "",
+                "## Local context file",
+                (context_file_text or "(empty)")[:8000],
+                "",
+                "## Webpage text (truncated)",
+                (webpage_text or "(empty)")[:8000],
+            ]
+        )
+        system = (
+            "You identify the advertised product or mobile app from the combined materials. "
+            "Respond with ONLY a JSON object (no markdown fences) using exactly these keys:\n"
+            '- "title": string, product or app name.\n'
+            '- "icon_url": string, absolute https URL to a product/app icon if clearly present in '
+            "the webpage or context; otherwise use an empty string.\n"
+            '- "button_txt": exactly "Get" if the ad mainly encourages purchasing or obtaining a '
+            'product/subscription; exactly "install app" if it mainly encourages installing a mobile app. '
+            "Pick one.\n"
+            '- "description": exactly two short sentences separated by a single newline character.\n'
+        )
+        resp = self.client.chat.completions.create(
+            model=self.settings.enrichment_model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": body},
+            ],
+            max_tokens=800,
+            temperature=0.2,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        try:
+            data = _parse_llm_json_object(raw)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise MediaError(f"Could not parse ad metadata JSON from model: {raw[:500]}") from e
+        out: dict[str, str] = {}
+        for k in ("title", "icon_url", "button_txt", "description"):
+            out[k] = str(data.get(k, "") or "").strip()
+        return out
 
     def analyze(
         self,

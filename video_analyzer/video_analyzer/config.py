@@ -32,6 +32,7 @@ class Settings:
     hf_asr_batch_size: int = 8
     vision_model: str = "(paid) gpt-4o-mini"
     summary_model: str = "(paid) gpt-4o-mini"
+    enrichment_model: str = "(paid) gpt-4o-mini"
     frame_interval_sec: float = 15.0
     max_frames: int = 24
     vision_batch_size: int = 8
@@ -40,7 +41,7 @@ class Settings:
 
     @staticmethod
     def from_env() -> "Settings":
-        key = "TODO: update" #os.environ.get("OPENAI_API_KEY", "").strip()
+        key = os.environ.get("OPENAI_API_KEY", "").strip()
         if not key:
             raise ValueError(
                 "OPENAI_API_KEY is not set. Copy .env.example to .env and add your key."
@@ -64,6 +65,7 @@ class Settings:
             hf_asr_batch_size=int(_env("VIDEO_ANALYZER_HF_ASR_BATCH_SIZE", "8")),
             vision_model=_env("VIDEO_ANALYZER_VISION_MODEL", "(paid) gpt-4o-mini"),
             summary_model=_env("VIDEO_ANALYZER_SUMMARY_MODEL", "(paid) gpt-4o-mini"),
+            enrichment_model=_env("VIDEO_ANALYZER_ENRICHMENT_MODEL", "(paid) gpt-4o-mini"),
             frame_interval_sec=float(_env("VIDEO_ANALYZER_FRAME_INTERVAL_SEC", "15")),
             max_frames=int(_env("VIDEO_ANALYZER_MAX_FRAMES", "24")),
             vision_batch_size=int(_env("VIDEO_ANALYZER_VISION_BATCH_SIZE", "8")),

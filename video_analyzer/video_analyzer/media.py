@@ -1,3 +1,5 @@
+"""ffmpeg/ffprobe helpers. Containers such as MP4 and QuickTime MOV are supported."""
+
 from __future__ import annotations
 
 import shutil
